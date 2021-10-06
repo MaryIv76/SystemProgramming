@@ -43,11 +43,21 @@ DNSHandle InitDNS()
 unsigned int HashLy(const char* str)
 {
 	unsigned int hash = 0;
+	const int const1 = 1664525;
+	const int const2 = 1013904223;
 
 	for (; *str; str++)
-		hash = (hash * 1664525) + (unsigned char)(*str) + 1013904223;
+		hash = (hash * const1) + (unsigned char)(*str) + const2;
 
 	return hash % HASH_TABLE_SIZE;
+}
+
+void CreateCurrentDNSInfo(PDNS_INFO currentDNSInfo, IPADDRESS ip, char* domain)
+{
+	currentDNSInfo->domainName = (char*)malloc(strlen(domain) + 1);
+	strcpy(currentDNSInfo->domainName, domain);
+	currentDNSInfo->ip = ip;
+	currentDNSInfo->nextDNSInfo = NULL;
 }
 
 void AddToHashTable(DNSHandle hDNS, IPADDRESS ip, char* domain)
@@ -58,10 +68,7 @@ void AddToHashTable(DNSHandle hDNS, IPADDRESS ip, char* domain)
 
 	if (currentDNSInfo->domainName == NULL)
 	{
-		currentDNSInfo->domainName = (char*)malloc(strlen(domain) + 1);
-		strcpy(currentDNSInfo->domainName, domain);
-		currentDNSInfo->ip = ip;
-		currentDNSInfo->nextDNSInfo = NULL;
+		CreateCurrentDNSInfo(currentDNSInfo, ip, domain);
 	}
 	else
 	{
@@ -71,10 +78,7 @@ void AddToHashTable(DNSHandle hDNS, IPADDRESS ip, char* domain)
 		}
 
 		currentDNSInfo->nextDNSInfo = (PDNS_INFO)malloc(sizeof(DNS_INFO));
-		currentDNSInfo->nextDNSInfo->domainName = (char*)malloc(strlen(domain) + 1);
-		strcpy(currentDNSInfo->nextDNSInfo->domainName, domain);
-		currentDNSInfo->nextDNSInfo->ip = ip;
-		currentDNSInfo->nextDNSInfo->nextDNSInfo = NULL;
+		CreateCurrentDNSInfo(currentDNSInfo->nextDNSInfo, ip, domain);
 	}
 }
 
@@ -87,10 +91,12 @@ void LoadHostsFile(DNSHandle hDNS, const char* hostsFilePath)
 		return;
 
 	unsigned int ipPart1 = 0, ipPart2 = 0, ipPart3 = 0, ipPart4 = 0;
-	char* domain = (char*)malloc(301);
+	const int domainLength = 300;
+	char* domain = (char*)malloc(domainLength + 1);
 
-	while (fscanf_s(fInput, "%d.%d.%d.%d %s", &ipPart1, &ipPart2, &ipPart3, &ipPart4, domain, 300) != EOF)
+	while (fscanf_s(fInput, "%d.%d.%d.%d %s", &ipPart1, &ipPart2, &ipPart3, &ipPart4, domain, domainLength) != EOF)
 	{
+		// Fowler "Refactoring" Extract Method?
 		IPADDRESS ip = (ipPart1 & 0xFF) << 24 |
 			(ipPart2 & 0xFF) << 16 |
 			(ipPart3 & 0xFF) << 8 |
@@ -123,30 +129,30 @@ IPADDRESS DnsLookUp(DNSHandle hDNS, const char* hostName)
 
 void ShutdownDNS(DNSHandle hDNS)
 {
-	PDNS_INFO DNSInfo1;
-	PDNS_INFO DNSInfo2;
+	PDNS_INFO currentDNSInfo;
+	PDNS_INFO nextDNSInfo;
 
 	for (int i = 0; i < HASH_TABLE_SIZE; i++)
 	{
-		int k = 0;
-		DNSInfo1 = &((PDNS_INFO)hDNS)[i];
-		while (DNSInfo1 != NULL)
+		int indexInList = 0;
+		nextDNSInfo = &((PDNS_INFO)hDNS)[i];
+		while (nextDNSInfo != NULL)
 		{
-			DNSInfo2 = DNSInfo1;
-			DNSInfo1 = DNSInfo1->nextDNSInfo;
+			currentDNSInfo = nextDNSInfo;
+			nextDNSInfo = currentDNSInfo->nextDNSInfo;
 
-			if (DNSInfo2->domainName)
+			if (currentDNSInfo->domainName)
 			{
-				free(DNSInfo2->domainName);
+				free(currentDNSInfo->domainName);
 			}
 
-			k++;
-			if (k == 1)
+			indexInList++;
+			if (indexInList == 1)
 			{
 				continue;
 			}
 
-			free(DNSInfo2);
+			free(currentDNSInfo);
 		}
 	}
 
