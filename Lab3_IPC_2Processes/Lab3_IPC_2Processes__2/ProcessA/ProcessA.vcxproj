@@ -139,7 +139,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="C:\Users\Администратор\Downloads\Лабораторная работа №3\Лабораторная работа №3\Lab3\ProcessA\ProcessA.c" />
+    <ClCompile Include="ProcessA.c" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ProcessB\ProcessB.vcxproj">
